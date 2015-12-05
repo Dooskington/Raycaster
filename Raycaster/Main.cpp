@@ -1,6 +1,14 @@
-#include <iostream>
-#include <SDL.h>
+#include "PCH.hpp"
 #include "Main.hpp"
+
+static const Color BLACK(0, 0, 0);
+static const Color WHITE(255, 255, 255);
+static const Color GRAY(128, 128, 128);
+static const Color RED(255, 0, 0);
+static const Color GREEN(0, 255, 0);
+static const Color BLUE(0, 0, 255);
+static const Color CYAN(0, 255, 255);
+static const Color MAGENTA(255, 0, 255);
 
 int main(int argc, char** argv)
 {
@@ -63,13 +71,7 @@ int main(int argc, char** argv)
                         posX += dirX * moveSpeed;
                         posY += dirY * moveSpeed;
                         break;
-                    case SDLK_a:
-                        posY += dirX * moveSpeed;
-                        break;
                     case SDLK_d:
-                        posY -= dirX * moveSpeed;
-                        break;
-                    case SDLK_e:
                         oldDirX = dirX;
                         dirX = dirX * cos(-rotationSpeed) - dirY * sin(-rotationSpeed);
                         dirY = oldDirX * sin(-rotationSpeed) + dirY * cos(-rotationSpeed);
@@ -82,7 +84,7 @@ int main(int argc, char** argv)
                         posX -= dirX * moveSpeed;
                         posY -= dirY * moveSpeed;
                         break;
-                    case SDLK_q:
+                    case SDLK_a:
                         oldDirX = dirX;
                         dirX = dirX * cos(rotationSpeed) - dirY * sin(rotationSpeed);
                         dirY = oldDirX * sin(rotationSpeed) + dirY * cos(rotationSpeed);
@@ -207,29 +209,29 @@ void Update()
         }
 
         // Determine the color
-        byte color;
+        Color color;
         switch (worldMap[mapX][mapY])
         {
             case 1:
-                color = 0xFF;
+                color = WHITE;
                 break;
             case 2:
-                color = 0xFF;
+                color = RED;
                 break;
             case 3:
-                color = 0xFF;
+                color = GREEN;
                 break;
             case 4:
-                color = 0xFF;
+                color = BLUE;
                 break;
             default:
-                color = 0xFF;
+                color = MAGENTA;
                 break;
         }
 
         if (side == 1)
         {
-            color = color / 2;
+            color = Color(color.GetR() / 2, color.GetG() / 2, color.GetB() / 2);
         }
         
         DrawVerticalLine(x, drawStart, drawEnd, color);
@@ -252,20 +254,20 @@ void Render()
     {
         for (int y = 0; y < height; y++)
         {
-            byte color = pixels[x][y];
-            SDL_SetRenderDrawColor(renderer, color, color, color, 0xFF);
+            Color color = pixels[x][y];
+            SDL_SetRenderDrawColor(renderer, color.GetR(), color.GetG(), color.GetB(), color.GetA());
             SDL_RenderDrawPoint(renderer, x, y);
         }
     }
 
-    //SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
-    //SDL_RenderDrawLine(renderer, posX, posY, posX + dirX * 5, posX + dirY * 5);
-
-    //SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
-    //SDL_RenderDrawPoint(renderer, posX, posY);
-
     SDL_RenderPresent(renderer);
-    memset(pixels, 0x00, (width * height) * 1);
+    for (int x = 0; x < width; x++)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            SetPixel(x, y, BLACK);
+        }
+    }
 }
 
 void Quit()
@@ -276,7 +278,7 @@ void Quit()
     SDL_Quit();
 }
 
-void SetPixel(int x, int y, byte color)
+void SetPixel(int x, int y, Color color)
 {
     if (x < 0 || y < 0 || x >= width || y >= height)
     {
@@ -286,7 +288,7 @@ void SetPixel(int x, int y, byte color)
     pixels[x][y] = color;
 }
 
-void DrawVerticalLine(int x, int y1, int y2, byte color)
+void DrawVerticalLine(int x, int y1, int y2, Color color)
 {
     if (y2 < 0 || y1 >= height || x < 0 || x >= width)
     {
