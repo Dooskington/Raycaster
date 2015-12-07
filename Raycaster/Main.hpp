@@ -2,6 +2,7 @@
 
 #include "PCH.hpp"
 #include <math.h>
+#include "Timer.hpp"
 #include "Color.hpp"
 #include "Vector2D.hpp"
 
@@ -46,16 +47,7 @@ bool isRunning;
 
 SDL_Window* window;
 SDL_Renderer* renderer;
-
-void ProcessInput();
-void Update();
-void Render();
-void Quit();
-
-void SetPixel(int x, int y, Color color);
-void DrawVerticalLine(int x, int y1, int y2, Color color);
-void DrawLine(Vector2D start, Vector2D end, Color color);
-void DrawRect(int x, int y, int width, int height, Color color);
+SDL_Texture* screenTexture;
 
 const int width = 640;
 const int height = 480;
@@ -69,4 +61,14 @@ double rotationSpeed;
 double oldDirX;
 double oldPlaneX;
 
-Color pixels[width * height];
+byte pixels[width * height * 4];
+
+void ProcessInput();
+void Update();
+void Render();
+void Quit();
+
+void SetPixel(int x, int y, Color color);
+void DrawVerticalLine(int x, int y1, int y2, Color color);
+void DrawLine(Vector2D start, Vector2D end, Color color);
+void DrawRect(int x, int y, int width, int height, Color color);

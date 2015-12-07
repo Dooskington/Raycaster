@@ -42,12 +42,15 @@ int main(int argc, char** argv)
     }
 
     // Create renderer
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == nullptr)
     {
         std::cerr << "Renderer could not be created! SDL error: " << SDL_GetError() << std::endl;
         return false;
     }
+
+    // Create the screen texture
+    screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
 
     SDL_Event event;
     while (isRunning)
@@ -238,7 +241,7 @@ void Update()
 
 
     // Direction Line
-    ///DrawLine(position * 8, (position + direction * 5) * 8, MAGENTA);
+    // DrawLine(position * 8, (position + direction * 5) * 8, MAGENTA);
 
     // Camera Plane
     //DrawLine((position + direction - cameraPlane) * 8, ((position + direction + cameraPlane) * 8), MAGENTA);
@@ -257,40 +260,29 @@ void Update()
 
 void Render()
 {
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0xFF, 0xFF);
+    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     SDL_RenderClear(renderer);
 
-    for (int x = 0; x < width; x++)  
-    {
-        for (int y = 0; y < height; y++)
-        {
-            Color color = pixels[(y * width) + x];
-            SDL_SetRenderDrawColor(renderer, color.GetR(), color.GetG(), color.GetB(), color.GetA());
-            SDL_RenderDrawPoint(renderer, x, y);
-        }
-    }
+    byte* pPixels;
+    int pitch = 0;
+    SDL_LockTexture(screenTexture, nullptr, (void**)&pPixels, &pitch);
 
-    Color color = MAGENTA;
-    SDL_SetRenderDrawColor(renderer, color.GetR(), color.GetG(), color.GetB(), color.GetA());
+    memcpy(pPixels, pixels, (width * height) * 4);
 
-    // cameraPlane
-    //SDL_RenderDrawLine(renderer, (direction.GetX() - cameraPlane.GetX()) * 8, (direction.GetY() - cameraPlane.GetY()) * 8, (direction.GetX() + cameraPlane.GetX()) * 8, (direction.GetY() + cameraPlane.GetY()) * 8);
-    //SDL_RenderDrawLine(renderer, (position.GetX() + direction.GetX() - cameraPlane.GetX()) * 8, (position.GetY() + direction.GetY() - cameraPlane.GetY()) * 8, (position.GetX() + direction.GetX() + cameraPlane.GetX()) * 8, (position.GetY() + direction.GetY() - cameraPlane.GetY()) * 8);
+    SDL_UnlockTexture(screenTexture);
+
+    SDL_Rect renderRect = { 0, 0, width, height };
+    SDL_RenderCopy(renderer, screenTexture, nullptr, &renderRect);
 
     SDL_RenderPresent(renderer);
-    for (int x = 0; x < width; x++)
-    {
-        for (int y = 0; y < height; y++)
-        {
-            SetPixel(x, y, BLACK);
-        }
-    }
+    memset(pixels, 0x00, width * height * 4);
 }
 
 void Quit()
 {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    SDL_DestroyTexture(screenTexture);
 
     SDL_Quit();
 }
@@ -302,7 +294,10 @@ void SetPixel(int x, int y, Color color)
         return;
     }
 
-    pixels[(y * width) + x] = color;
+    pixels[((y * width) + x) * 4 + 3] = color.GetR();
+    pixels[((y * width) + x) * 4 + 2] = color.GetG();
+    pixels[((y * width) + x) * 4 + 1] = color.GetB();
+    pixels[((y * width) + x) * 4 + 0] = color.GetA();
 }
 
 void DrawVerticalLine(int x, int y1, int y2, Color color)
