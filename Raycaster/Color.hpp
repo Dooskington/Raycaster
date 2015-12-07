@@ -2,20 +2,21 @@
 
 #include "PCH.hpp"
 
-class Color {
+class Color
+{
     public:
-        Color(const byte& red, const byte& green, const byte& blue, const byte& alpha);
-        Color(const byte& red, const byte& green, const byte& blue);
         Color();
+        Color(const byte& red, const byte& green, const byte& blue);
+        Color(const byte& red, const byte& green, const byte& blue, const byte& alpha);
 
         void SetR(const byte& val);
-        byte GetR();
+        byte GetR() const;
         void SetG(const byte& val);
-        byte GetG();
+        byte GetG() const;
         void SetB(const byte& val);
-        byte GetB();
+        byte GetB() const;
         void SetA(const byte& val);
-        byte GetA();
+        byte GetA() const;
 
     private:
         byte m_red;

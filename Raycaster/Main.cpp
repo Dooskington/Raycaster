@@ -15,18 +15,15 @@ int main(int argc, char** argv)
     isRunning = true;
 
     // Initial x and y position
-    posX = 22;
-    posY = 12;
+    position = Vector2D(14.5, 20);
     
     // Initial direction vector
-    dirX = -1;
-    dirY = 0;
+    direction = Vector2D(0, -1);
 
     // Camera plane
-    planeX = 0;
-    planeY = 1;
+    cameraPlane = Vector2D(1, 0);
 
-    moveSpeed = 0.5;
+    moveSpeed = .2;
     rotationSpeed = 0.2;
 
     // Initialize SDL
@@ -62,41 +59,9 @@ int main(int argc, char** argv)
             {
                 isRunning = false;
             }
-
-            if (event.type == SDL_KEYDOWN)
-            {
-                switch (event.key.keysym.sym)
-                {
-                    case SDLK_w:
-                        posX += dirX * moveSpeed;
-                        posY += dirY * moveSpeed;
-                        break;
-                    case SDLK_d:
-                        oldDirX = dirX;
-                        dirX = dirX * cos(-rotationSpeed) - dirY * sin(-rotationSpeed);
-                        dirY = oldDirX * sin(-rotationSpeed) + dirY * cos(-rotationSpeed);
-
-                        oldPlaneX = planeX;
-                        planeX = planeX * cos(-rotationSpeed) - planeY * sin(-rotationSpeed);
-                        planeY = oldPlaneX * sin(-rotationSpeed) + planeY * cos(-rotationSpeed);
-                        break;
-                    case SDLK_s:
-                        posX -= dirX * moveSpeed;
-                        posY -= dirY * moveSpeed;
-                        break;
-                    case SDLK_a:
-                        oldDirX = dirX;
-                        dirX = dirX * cos(rotationSpeed) - dirY * sin(rotationSpeed);
-                        dirY = oldDirX * sin(rotationSpeed) + dirY * cos(rotationSpeed);
-
-                        oldPlaneX = planeX;
-                        planeX = planeX * cos(rotationSpeed) - planeY * sin(rotationSpeed);
-                        planeY = oldPlaneX * sin(rotationSpeed) + planeY * cos(rotationSpeed);
-                        break;
-                }
-            }
         }
 
+        ProcessInput();
         Update();
         Render();
     }
@@ -106,16 +71,53 @@ int main(int argc, char** argv)
     return 0;
 }
 
+void ProcessInput()
+{
+    const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
+
+    if (currentKeyStates[SDL_SCANCODE_W])
+    {
+        position.SetY(position.GetY() - 1 * moveSpeed);
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_A])
+    {
+        position.SetX(position.GetX() - 1 * moveSpeed);
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_S])
+    {
+        position.SetY(position.GetY() + 1 * moveSpeed);
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_D])
+    {
+        position.SetX(position.GetX() + 1 * moveSpeed);
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_1])
+    {
+        cameraPlane = cameraPlane * .9;
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_2])
+    {
+        cameraPlane = cameraPlane * 1.1;
+    }
+}
+
 void Update()
 {
     for (int x = 0; x < width; x++)
     {
+        DrawLine(Vector2D(x, height / 2), Vector2D(x, height), GRAY);
+
         // Calculate the ray position and direction
         double cameraX = 2 * x / (double)width - 1.0; // X coordinate, in camera space
-        double rayPosX = posX;
-        double rayPosY = posY;
-        double rayDirX = dirX + (planeX * cameraX);
-        double rayDirY = dirY + (planeY * cameraX);
+        double rayPosX = position.GetX();
+        double rayPosY = position.GetY();
+        double rayDirX = direction.GetX() + (cameraPlane.GetX() * cameraX);
+        double rayDirY = direction.GetY() + (cameraPlane.GetY() * cameraX);
 
         int mapX = (int)rayPosX;
         int mapY = (int)rayPosY;
@@ -176,7 +178,7 @@ void Update()
                 side = 1;
             }
 
-            if (worldMap[mapX][mapY] > 0)
+            if (map[(mapY * MAP_WIDTH) + mapX] > 0)
             {
                 hit = 1;
             }
@@ -185,11 +187,11 @@ void Update()
         // Calculate the distance
         if (side == 0)
         {
-            perpWallDist = abs((mapX - posX + (1 - stepX) / 2) / rayDirX);
+            perpWallDist = abs((mapX - position.GetX() + (1 - stepX) / 2) / rayDirX);
         }
         else
         {
-            perpWallDist = abs((mapY - posY + (1 - stepY) / 2) / rayDirY);
+            perpWallDist = abs((mapY - position.GetY() + (1 - stepY) / 2) / rayDirY);
         }
 
         // Calculate the line height
@@ -197,32 +199,23 @@ void Update()
 
         // Calculate the lowest and highest pixel of the line
         int drawStart = (-lineHeight / 2) + (height / 2);
-        if (drawStart < 0)
-        {
-            drawStart = 0;
-        }
-
         int drawEnd = (lineHeight / 2) + (height / 2);
-        if (drawEnd >= height)
-        {
-            drawEnd = height - 1;
-        }
 
         // Determine the color
         Color color;
-        switch (worldMap[mapX][mapY])
+        switch (map[(mapY * MAP_WIDTH) + mapX])
         {
             case 1:
-                color = WHITE;
-                break;
-            case 2:
                 color = RED;
                 break;
-            case 3:
+            case 2:
                 color = GREEN;
                 break;
-            case 4:
+            case 3:
                 color = BLUE;
+                break;
+            case 4:
+                color = WHITE;
                 break;
             default:
                 color = MAGENTA;
@@ -234,14 +227,31 @@ void Update()
             color = Color(color.GetR() / 2, color.GetG() / 2, color.GetB() / 2);
         }
         
+        // Wall
+        //DrawLine(Vector2D(x, drawStart), Vector2D(x, drawEnd), color);
         DrawVerticalLine(x, drawStart, drawEnd, color);
 
-        //if (x % 2 == 0)
-        //{
-        //    DrawVerticalLine(x, 0, height, 0xFF);
-        //}
+        // Ray
+        DrawLine(Vector2D(rayPosX, rayPosY) * 8, (Vector2D(rayPosX, rayPosY) + Vector2D(rayDirX * perpWallDist, rayDirY * perpWallDist)) * 8, MAGENTA);
+        //DrawLine(Vector2D(rayPosX, rayPosY) * 8, (Vector2D(rayPosX, rayPosY) + Vector2D(rayDirX, rayDirY)) * 8, MAGENTA);
+    }
 
-        //DrawVerticalLine(10, 0, height, 0xFF);
+
+    // Direction Line
+    ///DrawLine(position * 8, (position + direction * 5) * 8, MAGENTA);
+
+    // Camera Plane
+    //DrawLine((position + direction - cameraPlane) * 8, ((position + direction + cameraPlane) * 8), MAGENTA);
+
+    for (int x = 0; x < MAP_WIDTH; x++)
+    {
+        for (int y = 0; y < MAP_HEIGHT; y++)
+        {
+            if (map[(y * MAP_WIDTH) + x] != 0)
+            {
+                DrawRect((x * 8), (y * 8), 8, 8, WHITE);
+            }
+        }
     }
 }
 
@@ -254,11 +264,18 @@ void Render()
     {
         for (int y = 0; y < height; y++)
         {
-            Color color = pixels[x][y];
+            Color color = pixels[(y * width) + x];
             SDL_SetRenderDrawColor(renderer, color.GetR(), color.GetG(), color.GetB(), color.GetA());
             SDL_RenderDrawPoint(renderer, x, y);
         }
     }
+
+    Color color = MAGENTA;
+    SDL_SetRenderDrawColor(renderer, color.GetR(), color.GetG(), color.GetB(), color.GetA());
+
+    // cameraPlane
+    //SDL_RenderDrawLine(renderer, (direction.GetX() - cameraPlane.GetX()) * 8, (direction.GetY() - cameraPlane.GetY()) * 8, (direction.GetX() + cameraPlane.GetX()) * 8, (direction.GetY() + cameraPlane.GetY()) * 8);
+    //SDL_RenderDrawLine(renderer, (position.GetX() + direction.GetX() - cameraPlane.GetX()) * 8, (position.GetY() + direction.GetY() - cameraPlane.GetY()) * 8, (position.GetX() + direction.GetX() + cameraPlane.GetX()) * 8, (position.GetY() + direction.GetY() - cameraPlane.GetY()) * 8);
 
     SDL_RenderPresent(renderer);
     for (int x = 0; x < width; x++)
@@ -285,28 +302,43 @@ void SetPixel(int x, int y, Color color)
         return;
     }
 
-    pixels[x][y] = color;
+    pixels[(y * width) + x] = color;
 }
 
 void DrawVerticalLine(int x, int y1, int y2, Color color)
 {
-    if (y2 < 0 || y1 >= height || x < 0 || x >= width)
-    {
-        return;
-    }
-
-    if (y1 < 0)
-    {
-        y1 = 0;
-    }
-
-    if (y2 >= width)
-    {
-        y2 = width - 1;
-    }
-
     for (int y = y1; y <= y2; y++)
     {
         SetPixel(x, y, color);
+    }
+}
+
+void DrawLine(Vector2D start, Vector2D end, Color color)
+{
+    double x = end.GetX() - start.GetX();
+    double y = end.GetY() - start.GetY();
+    double length = sqrt(x*x + y*y);
+
+    double addx = x / length;
+    double addy = y / length;
+
+    x = start.GetX();
+    y = start.GetY();
+
+    for (int i = 0; i < length; i += 1)
+    {
+        SetPixel(start.GetX(), start.GetY(), color);
+        start = start + Vector2D(addx, addy);
+    }
+}
+
+void DrawRect(int x, int y, int width, int height, Color color)
+{
+    for (int xIndex = 0; xIndex < width; xIndex++)
+    {
+        for (int yIndex = 0; yIndex < height; yIndex++)
+        {
+            SetPixel(x + xIndex, y + yIndex, color);
+        }
     }
 }
