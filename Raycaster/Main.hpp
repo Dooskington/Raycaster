@@ -56,11 +56,12 @@ const int height = 480;
 Vector2D position;
 Vector2D direction;
 Vector2D cameraPlane;
+double rotation;
 
 double deltaTime;
 
-double moveSpeed = 5;
-double rotationSpeed = 0.5;
+double moveSpeed = 3;
+double rotationSpeed = 90;
 double oldDirX;
 double oldPlaneX;
 

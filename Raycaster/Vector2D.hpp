@@ -13,11 +13,14 @@ public:
     void SetY(const double& y);
     double GetY() const;
 
+    void Rotate(const double& radians);
+
     Vector2D operator+(const Vector2D& other);
     void operator+=(const Vector2D& other);
     Vector2D operator+(const double& val);
     Vector2D operator-(const double& val);
     Vector2D operator-(const Vector2D& other);
+    void operator-=(const Vector2D& other);
     Vector2D operator*(const Vector2D& other);
     Vector2D operator*(const double& scalar);
     bool operator==(const Vector2D& other);

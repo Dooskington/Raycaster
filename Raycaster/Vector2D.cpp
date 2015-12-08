@@ -38,6 +38,13 @@ double Vector2D::GetY() const
     return m_y;
 }
 
+void Vector2D::Rotate(const double& degrees)
+{
+    double radians = degrees * (M_PI / 180.0);
+    m_x = m_x * cos(radians) - m_y * sin(radians);
+    m_y = m_x * sin(radians) + m_y * cos(radians);
+}
+
 // TODO 
 // Refactor the following?
 
@@ -81,6 +88,12 @@ Vector2D Vector2D::operator-(const Vector2D& other)
     vec.m_y = m_y - other.m_y;
 
     return vec;
+}
+
+void Vector2D::operator-=(const Vector2D& other)
+{
+    m_x = m_x - other.m_x;
+    m_y = m_y - other.m_y;
 }
 
 Vector2D Vector2D::operator*(const Vector2D& other)

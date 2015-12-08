@@ -97,22 +97,32 @@ void ProcessInput()
 
     if (currentKeyStates[SDL_SCANCODE_W])
     {
-        movement = movement + Vector2D(0, -1);
+        movement += direction * moveSpeed;
     }
 
     if (currentKeyStates[SDL_SCANCODE_A])
     {
-        movement = movement + Vector2D(-1, 0);
+        movement += Vector2D(direction.GetY(), -direction.GetX()) * moveSpeed;
     }
 
     if (currentKeyStates[SDL_SCANCODE_S])
     {
-        movement = movement + Vector2D(0, 1);
+        movement -= direction * moveSpeed;
     }
 
     if (currentKeyStates[SDL_SCANCODE_D])
     {
-        movement = movement + Vector2D(1, 0);
+        movement += Vector2D(-direction.GetY(), direction.GetX()) * moveSpeed;
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_Q])
+    {
+        rotation -= rotationSpeed * deltaTime;
+    }
+
+    if (currentKeyStates[SDL_SCANCODE_E])
+    {
+        rotation += rotationSpeed * deltaTime;
     }
 
     if (currentKeyStates[SDL_SCANCODE_1])
@@ -130,6 +140,10 @@ void ProcessInput()
 
 void Update()
 {
+    direction.Rotate(rotation);
+    cameraPlane.Rotate(rotation);
+    rotation = 0;
+
     for (int x = 0; x < width; x++)
     {
         DrawLine(Vector2D(x, height / 2), Vector2D(x, height), GRAY);
@@ -252,18 +266,17 @@ void Update()
         DrawVerticalLine(x, drawStart, drawEnd, color);
 
         // Ray
-        //DrawLine(rayPosition * 8, (rayPosition + Vector2D(rayDirection.GetX() * perpWallDistance, rayDirection.GetY() * perpWallDistance)) * 8, MAGENTA);
+        DrawLine(rayPosition * 8, (rayPosition + Vector2D(rayDirection.GetX() * perpWallDistance, rayDirection.GetY() * perpWallDistance)) * 8, MAGENTA);
         //DrawLine(Vector2D(rayPositionX, rayPositionY) * 8, (Vector2D(rayPositionX, rayPositionY) + Vector2D(rayDirectionX, rayDirectionY)) * 8, MAGENTA);
     }
 
 
     // Direction Line
-    // DrawLine(position * 8, (position + direction * 5) * 8, MAGENTA);
+    //DrawLine(position * 8, (position + direction * 5) * 8, MAGENTA);
 
     // Camera Plane
     //DrawLine((position + direction - cameraPlane) * 8, ((position + direction + cameraPlane) * 8), MAGENTA);
 
-    /*
     for (int x = 0; x < MAP_WIDTH; x++)
     {
         for (int y = 0; y < MAP_HEIGHT; y++)
@@ -274,7 +287,6 @@ void Update()
             }
         }
     }
-    */
 }
 
 void Render()
