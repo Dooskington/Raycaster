@@ -14,7 +14,9 @@ public:
     double GetY() const;
 
     Vector2D operator+(const Vector2D& other);
+    void operator+=(const Vector2D& other);
     Vector2D operator+(const double& val);
+    Vector2D operator-(const double& val);
     Vector2D operator-(const Vector2D& other);
     Vector2D operator*(const Vector2D& other);
     Vector2D operator*(const double& scalar);

@@ -50,11 +50,26 @@ Vector2D Vector2D::operator+(const Vector2D& other)
     return vec;
 }
 
+void Vector2D::operator+=(const Vector2D& other)
+{
+    m_x += other.m_x;
+    m_y += other.m_y;
+}
+
 Vector2D Vector2D::operator+(const double& val)
 {
     Vector2D vec;
     vec.m_x = m_x + val;
     vec.m_y = m_y + val;
+
+    return vec;
+}
+
+Vector2D Vector2D::operator-(const double& val)
+{
+    Vector2D vec;
+    vec.m_x = m_x - val;
+    vec.m_y = m_y - val;
 
     return vec;
 }

@@ -6,6 +6,7 @@
 #include "Color.hpp"
 #include "Vector2D.hpp"
 
+const int FRAMERATE = 60;
 const int MAP_WIDTH = 30;
 const int MAP_HEIGHT = 30;
 
@@ -56,8 +57,10 @@ Vector2D position;
 Vector2D direction;
 Vector2D cameraPlane;
 
-double moveSpeed;
-double rotationSpeed;
+double deltaTime;
+
+double moveSpeed = 5;
+double rotationSpeed = 0.5;
 double oldDirX;
 double oldPlaneX;
 
@@ -68,6 +71,7 @@ void Update();
 void Render();
 void Quit();
 
+int GetTile(Vector2D position);
 void SetPixel(int x, int y, Color color);
 void DrawVerticalLine(int x, int y1, int y2, Color color);
 void DrawLine(Vector2D start, Vector2D end, Color color);

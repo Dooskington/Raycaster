@@ -4,9 +4,9 @@
 static const Color BLACK(0, 0, 0);
 static const Color WHITE(255, 255, 255);
 static const Color GRAY(128, 128, 128);
-static const Color RED(255, 0, 0);
-static const Color GREEN(0, 255, 0);
-static const Color BLUE(0, 0, 255);
+static const Color RED(194, 59, 34);
+static const Color GREEN(119, 190, 119);
+static const Color BLUE(119, 158, 203);
 static const Color CYAN(0, 255, 255);
 static const Color MAGENTA(255, 0, 255);
 
@@ -22,9 +22,6 @@ int main(int argc, char** argv)
 
     // Camera plane
     cameraPlane = Vector2D(1, 0);
-
-    moveSpeed = .2;
-    rotationSpeed = 0.2;
 
     // Initialize SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
@@ -52,9 +49,14 @@ int main(int argc, char** argv)
     // Create the screen texture
     screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
 
+    double previousTime;
+    double currentTime = SDL_GetTicks();
+
     SDL_Event event;
     while (isRunning)
     {
+        double frameStartTime = SDL_GetTicks();
+
         // Poll for window input
         while (SDL_PollEvent(&event) != 0)
         {
@@ -67,6 +69,20 @@ int main(int argc, char** argv)
         ProcessInput();
         Update();
         Render();
+
+        double frameEndTime = SDL_GetTicks();
+        while (true)
+        {
+            frameEndTime = SDL_GetTicks();
+            double frameTime = (double)(frameEndTime - frameStartTime) / 1000;
+
+            // Break out once we use up our time per frame
+            if (frameTime >= (1 / FRAMERATE))
+            {
+                deltaTime = frameTime;
+                break;
+            }
+        }
     }
 
     Quit();
@@ -77,25 +93,26 @@ int main(int argc, char** argv)
 void ProcessInput()
 {
     const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
+    Vector2D movement(0, 0);
 
     if (currentKeyStates[SDL_SCANCODE_W])
     {
-        position.SetY(position.GetY() - 1 * moveSpeed);
+        movement = movement + Vector2D(0, -1);
     }
 
     if (currentKeyStates[SDL_SCANCODE_A])
     {
-        position.SetX(position.GetX() - 1 * moveSpeed);
+        movement = movement + Vector2D(-1, 0);
     }
 
     if (currentKeyStates[SDL_SCANCODE_S])
     {
-        position.SetY(position.GetY() + 1 * moveSpeed);
+        movement = movement + Vector2D(0, 1);
     }
 
     if (currentKeyStates[SDL_SCANCODE_D])
     {
-        position.SetX(position.GetX() + 1 * moveSpeed);
+        movement = movement + Vector2D(1, 0);
     }
 
     if (currentKeyStates[SDL_SCANCODE_1])
@@ -107,6 +124,8 @@ void ProcessInput()
     {
         cameraPlane = cameraPlane * 1.1;
     }
+
+    position = position + (movement * moveSpeed * deltaTime);
 }
 
 void Update()
@@ -116,89 +135,86 @@ void Update()
         DrawLine(Vector2D(x, height / 2), Vector2D(x, height), GRAY);
 
         // Calculate the ray position and direction
-        double cameraX = 2 * x / (double)width - 1.0; // X coordinate, in camera space
-        double rayPosX = position.GetX();
-        double rayPosY = position.GetY();
-        double rayDirX = direction.GetX() + (cameraPlane.GetX() * cameraX);
-        double rayDirY = direction.GetY() + (cameraPlane.GetY() * cameraX);
+        double cameraX = 2 * (x / (double)width) - 1; // X coordinate, in camera space
+        Vector2D rayPosition = position;
+        Vector2D rayDirection = direction + (cameraPlane * cameraX);
 
-        int mapX = (int)rayPosX;
-        int mapY = (int)rayPosY;
+        Vector2D mapPos((int)rayPosition.GetX(), (int)rayPosition.GetY());
 
-        // Length of ray from one x or y side to the next x or y side
-        double sideDistX;
-        double sideDistY;
+        // The distance from one x or y side to the next x or y side
+        double sideDistanceX = sqrt(1.0 + (rayDirection.GetY() * rayDirection.GetY() / (rayDirection.GetX() * rayDirection.GetX())));
+        double sideDistanceY = sqrt(1.0 + (rayDirection.GetX() * rayDirection.GetX() / (rayDirection.GetY() * rayDirection.GetY())));
 
-        // Length of ray from one x or y side to the next x or y side
-        double deltaDistX = sqrt(1.0 + (rayDirY * rayDirY) / (rayDirX * rayDirX));
-        double deltaDistY = sqrt(1.0 + (rayDirX * rayDirX) / (rayDirY * rayDirY));
-        double perpWallDist;
+        // The distance from the rays position to the next x or y side
+        double nextSideDistanceX;
+        double nextSideDistanceY;
 
         // Which direction to step
-        int stepX;
-        int stepY;
-        
-        int hit = 0;
-        int side;
+        Vector2D stepDirection;
 
         // Calculate step and initial sideDist
-        if (rayDirX < 0)
+        if (rayDirection.GetX() < 0)
         {
-            stepX = -1;
-            sideDistX = (rayPosX - mapX) * deltaDistX;
+            stepDirection.SetX(-1);
+            nextSideDistanceX = (rayPosition.GetX() - mapPos.GetX()) * sideDistanceX;
         }
         else
         {
-            stepX = 1;
-            sideDistX = (mapX + 1.0 - rayPosX) * deltaDistX;
+            stepDirection.SetX(1);
+            nextSideDistanceX = (mapPos.GetX() + 1.0 - rayPosition.GetX()) * sideDistanceX;
         }
 
-        if (rayDirY < 0)
+        if (rayDirection.GetY() < 0)
         {
-            stepY = -1;
-            sideDistY = (rayPosY - mapY) * deltaDistY;
+            stepDirection.SetY(-1);
+            nextSideDistanceY = (rayPosition.GetY() - mapPos.GetY()) * sideDistanceY;
         }
         else
         {
-            stepY = 1;
-            sideDistY = (mapY + 1.0 - rayPosY) * deltaDistY;
+            stepDirection.SetY(1);
+            nextSideDistanceY = (mapPos.GetY() + 1.0 - rayPosition.GetY()) * sideDistanceY;
         }
+        
+        bool hit = false;
+        int side;
 
         // Perform DDA
-        while (hit == 0)
+        while (!hit)
         {
             // Jump to the next map square
-            if (sideDistX < sideDistY)
+            if (nextSideDistanceX < nextSideDistanceY)
             {
-                sideDistX += deltaDistX;
-                mapX += stepX;
+                nextSideDistanceX += sideDistanceX;
+                mapPos.SetX(mapPos.GetX() + stepDirection.GetX());
                 side = 0;
             }
             else
             {
-                sideDistY += deltaDistY;
-                mapY += stepY;
+                nextSideDistanceY += sideDistanceY;
+                mapPos.SetY(mapPos.GetY() + stepDirection.GetY());
                 side = 1;
             }
 
-            if (map[(mapY * MAP_WIDTH) + mapX] > 0)
+            int tile = GetTile(mapPos);
+            if (tile > 0)
             {
-                hit = 1;
+                hit = true;
             }
         }
 
         // Calculate the distance
+        double perpWallDistance;
         if (side == 0)
         {
-            perpWallDist = abs((mapX - position.GetX() + (1 - stepX) / 2) / rayDirX);
+            perpWallDistance = abs((mapPos.GetX() - position.GetX() + (1 - stepDirection.GetX()) / 2) / rayDirection.GetX());
         }
         else
         {
-            perpWallDist = abs((mapY - position.GetY() + (1 - stepY) / 2) / rayDirY);
+            perpWallDistance = abs((mapPos.GetY() - position.GetY() + (1 - stepDirection.GetY()) / 2) / rayDirection.GetY());
         }
 
         // Calculate the line height
-        int lineHeight = abs((int)(height / perpWallDist));
+        int lineHeight = abs((int)(height / perpWallDistance));
 
         // Calculate the lowest and highest pixel of the line
         int drawStart = (-lineHeight / 2) + (height / 2);
@@ -206,7 +222,8 @@ void Update()
 
         // Determine the color
         Color color;
-        switch (map[(mapY * MAP_WIDTH) + mapX])
+        int tile = GetTile(mapPos);
+        switch (tile)
         {
             case 1:
                 color = RED;
@@ -235,8 +252,8 @@ void Update()
         DrawVerticalLine(x, drawStart, drawEnd, color);
 
         // Ray
-        DrawLine(Vector2D(rayPosX, rayPosY) * 8, (Vector2D(rayPosX, rayPosY) + Vector2D(rayDirX * perpWallDist, rayDirY * perpWallDist)) * 8, MAGENTA);
-        //DrawLine(Vector2D(rayPosX, rayPosY) * 8, (Vector2D(rayPosX, rayPosY) + Vector2D(rayDirX, rayDirY)) * 8, MAGENTA);
+        //DrawLine(rayPosition * 8, (rayPosition + Vector2D(rayDirection.GetX() * perpWallDistance, rayDirection.GetY() * perpWallDistance)) * 8, MAGENTA);
+        //DrawLine(Vector2D(rayPositionX, rayPositionY) * 8, (Vector2D(rayPositionX, rayPositionY) + Vector2D(rayDirectionX, rayDirectionY)) * 8, MAGENTA);
     }
 
 
@@ -246,6 +263,7 @@ void Update()
     // Camera Plane
     //DrawLine((position + direction - cameraPlane) * 8, ((position + direction + cameraPlane) * 8), MAGENTA);
 
+    /*
     for (int x = 0; x < MAP_WIDTH; x++)
     {
         for (int y = 0; y < MAP_HEIGHT; y++)
@@ -256,6 +274,7 @@ void Update()
             }
         }
     }
+    */
 }
 
 void Render()
@@ -285,6 +304,11 @@ void Quit()
     SDL_DestroyTexture(screenTexture);
 
     SDL_Quit();
+}
+
+int GetTile(Vector2D position)
+{
+    return map[((int)position.GetY() * MAP_WIDTH) + (int)position.GetX()];
 }
 
 void SetPixel(int x, int y, Color color)
