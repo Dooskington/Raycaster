@@ -19,6 +19,8 @@ public:
     void operator+=(const Vector2D& other);
     Vector2D operator+(const double& val);
     Vector2D operator-(const double& val);
+    Vector2D operator/(const double& val);
+    void operator/=(const double& val);
     Vector2D operator-(const Vector2D& other);
     void operator-=(const Vector2D& other);
     Vector2D operator*(const Vector2D& other);

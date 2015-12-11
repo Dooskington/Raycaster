@@ -14,15 +14,6 @@ int main(int argc, char** argv)
 {
     isRunning = true;
 
-    // Initial x and y position
-    position = Vector2D(14.5, 20);
-    
-    // Initial direction vector
-    direction = Vector2D(0, -1);
-
-    // Camera plane
-    cameraPlane = Vector2D(1, 0);
-
     // Initialize SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -31,7 +22,7 @@ int main(int argc, char** argv)
     }
 
     // Create window
-    window = SDL_CreateWindow("Raycaster", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("Raycaster", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
     if (window == nullptr)
     {
         std::cerr << "Window could not be created! SDL error: " << SDL_GetError() << std::endl;
@@ -47,7 +38,7 @@ int main(int argc, char** argv)
     }
 
     // Create the screen texture
-    screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+    screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, RENDER_WIDTH, RENDER_HEIGHT);
 
     double previousTime;
     double currentTime = SDL_GetTicks();
@@ -93,200 +84,246 @@ int main(int argc, char** argv)
 void ProcessInput()
 {
     const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
-    Vector2D movement(0, 0);
 
     if (currentKeyStates[SDL_SCANCODE_W])
     {
-        movement += direction * moveSpeed;
+        playerSpeed = 1;
     }
 
     if (currentKeyStates[SDL_SCANCODE_A])
     {
-        movement += Vector2D(direction.GetY(), -direction.GetX()) * moveSpeed;
+        playerDir = -1;
     }
 
     if (currentKeyStates[SDL_SCANCODE_S])
     {
-        movement -= direction * moveSpeed;
+        playerSpeed = -1;
     }
 
     if (currentKeyStates[SDL_SCANCODE_D])
     {
-        movement += Vector2D(-direction.GetY(), direction.GetX()) * moveSpeed;
+        playerDir = 1;
     }
 
     if (currentKeyStates[SDL_SCANCODE_Q])
     {
-        rotation -= rotationSpeed * deltaTime;
+
     }
 
     if (currentKeyStates[SDL_SCANCODE_E])
     {
-        rotation += rotationSpeed * deltaTime;
-    }
 
-    if (currentKeyStates[SDL_SCANCODE_1])
-    {
-        cameraPlane = cameraPlane * .9;
     }
+}
 
-    if (currentKeyStates[SDL_SCANCODE_2])
-    {
-        cameraPlane = cameraPlane * 1.1;
-    }
-
-    position = position + (movement * moveSpeed * deltaTime);
+double Rad(double deg)
+{
+    return deg * (M_PI / 180);
 }
 
 void Update()
 {
-    direction.Rotate(rotation);
-    cameraPlane.Rotate(rotation);
-    rotation = 0;
+    double moveStep = playerSpeed * (playerMoveSpeed * deltaTime);
+    double newX = playerX + cos(playerRot) * moveStep;
+    double newY = playerY + sin(playerRot) * moveStep;
 
-    for (int x = 0; x < width; x++)
+    playerX = newX;
+    playerY = newY;
+    playerRot += playerDir * (playerRotSpeed * deltaTime);
+    playerSpeed = 0;
+    playerDir = 0;
+
+    viewDist = (RENDER_WIDTH / 2) / tan(FOV / 2);
+
+    if (playerRot < 0)
     {
-        DrawLine(Vector2D(x, height / 2), Vector2D(x, height), GRAY);
+        playerRot += TWO_PI;
+    }
+    else if (playerRot >= TWO_PI)
+    {
+        playerRot -= TWO_PI;
+    }
 
-        // Calculate the ray position and direction
-        double cameraX = 2 * (x / (double)width) - 1; // X coordinate, in camera space
-        Vector2D rayPosition = position;
-        Vector2D rayDirection = direction + (cameraPlane * cameraX);
+    for (int x = 0; x < RENDER_WIDTH; x++)
+    {
+        // Where on the screen the ray goes through
+        double rayScreenPos = (-RENDER_WIDTH / 2 + x);
 
-        Vector2D mapPos((int)rayPosition.GetX(), (int)rayPosition.GetY());
+        // The distance from the viewer to the point on the screen
+        double rayViewDist = sqrt((rayScreenPos * rayScreenPos) + (viewDist * viewDist));
 
-        // The distance from one x or y side to the next x or y side
-        double sideDistanceX = sqrt(1.0 + (rayDirection.GetY() * rayDirection.GetY() / (rayDirection.GetX() * rayDirection.GetX())));
-        double sideDistanceY = sqrt(1.0 + (rayDirection.GetX() * rayDirection.GetX() / (rayDirection.GetY() * rayDirection.GetY())));
+        // The angle of the ray, relative to the viewing direction.
+        double rayAngle = asin(rayScreenPos / rayViewDist);
 
-        // The distance from the rays position to the next x or y side
-        double nextSideDistanceX;
-        double nextSideDistanceY;
+        CastRay(playerRot + rayAngle, x);
+    }
 
-        // Which direction to step
-        Vector2D stepDirection;
+    Minimap();
+}
 
-        // Calculate step and initial sideDist
-        if (rayDirection.GetX() < 0)
+void CastRay(double rayAngle, int col)
+{
+    //std::cout << "Reay at " << rayAngle * (180 / M_PI) << " degrees." << std::endl;
+    if (rayAngle < 0)
+    {
+        rayAngle += TWO_PI;
+    }
+    else if (rayAngle >= TWO_PI)
+    {
+        rayAngle -= TWO_PI;
+    }
+
+    // Check the quadrant of the ray
+    bool right = (rayAngle > TWO_PI * 0.75 || rayAngle < TWO_PI * 0.25);
+    bool up = (rayAngle < 0 || rayAngle > M_PI);
+
+    double dist = 0.0; // Distance to tile we hit
+
+    double xHit = 0.0;
+    double yHit = 0.0;
+
+    int tileX;
+    int tileY;
+
+    int hitTileX;
+    int hitTileY;
+
+    int side = 0;
+
+    // First check against the vertical tile lines
+    // We do this by moving to thr right or left edge of the block we're standing in,
+    // and then moving in 1 map unit steps horizontally. The amount we have to move vertically
+    // is determined by the slope of the way.
+
+    double slope = sin(rayAngle) / cos(rayAngle);
+    double dx = right ? 1 : -1; // We move either 1 map unit to the left or right
+    double dy = dx * slope; // How much to move up or done
+
+    double x = right ? ceil(playerX) : floor(playerX); // Starting horizontal position, at one of the edges of the current map tile
+    double y = playerY + (x - playerX) * slope; // starting vertical position. We add the small horizontal step we just made, multiplied by the slope.
+
+    while (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT)
+    {
+        int tileMapX = floor(x + (right ? 0 : -1));
+        int tileMapY = floor(y);
+
+        // Is this point inside a wall block?
+        if (GetTile(Vector2D(tileMapX, tileMapY)) > 0)
         {
-            stepDirection.SetX(-1);
-            nextSideDistanceX = (rayPosition.GetX() - mapPos.GetX()) * sideDistanceX;
+            double distX = x - playerX;
+            double distY = y - playerY;
+            dist = (distX * distX) + (distY * distY); // the distance from the player to this point, squared.
+
+            side = 0;
+
+            hitTileX = tileMapX;
+            hitTileY = tileMapY;
+
+            xHit = x;
+            yHit = y;
+
+            break;
         }
-        else
-        {
-            stepDirection.SetX(1);
-            nextSideDistanceX = (mapPos.GetX() + 1.0 - rayPosition.GetX()) * sideDistanceX;
-        }
 
-        if (rayDirection.GetY() < 0)
-        {
-            stepDirection.SetY(-1);
-            nextSideDistanceY = (rayPosition.GetY() - mapPos.GetY()) * sideDistanceY;
-        }
-        else
-        {
-            stepDirection.SetY(1);
-            nextSideDistanceY = (mapPos.GetY() + 1.0 - rayPosition.GetY()) * sideDistanceY;
-        }
-        
-        bool hit = false;
-        int side;
+        x += dx;
+        y += dy;
+    }
 
-        // Perform DDA
-        while (!hit)
+    // Now check against horizontal lines. it's basically the same thing, but turned around.
+    // The only difference here is that once we hit a map block, we check if there was also one
+    // found there in the vertical run. If so, we only register this hit if this distance is smaller.
+
+    slope = cos(rayAngle) / sin(rayAngle);
+    dy = up ? -1 : 1;
+    dx = dy * slope;
+    y = up ? floor(playerY) : ceil(playerY);
+    x = playerX + (y - playerY) * slope;
+
+    while (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT)
+    {
+        int tileMapX = floor(x);
+        int tileMapY = floor(y + (up ? -1 : 0));
+
+        // Is this point inside a wall block?
+        if (GetTile(Vector2D(tileMapX, tileMapY)) > 0)
         {
-            // Jump to the next map square
-            if (nextSideDistanceX < nextSideDistanceY)
+            double distX = x - playerX;
+            double distY = y - playerY;
+            double tileDist = (distX * distX) + (distY * distY);
+            if (!dist || tileDist < dist)
             {
-                nextSideDistanceX += sideDistanceX;
-                mapPos.SetX(mapPos.GetX() + stepDirection.GetX());
-                side = 0;
-            }
-            else
-            {
-                nextSideDistanceY += sideDistanceY;
-                mapPos.SetY(mapPos.GetY() + stepDirection.GetY());
+                dist = tileDist;
+
                 side = 1;
+
+                hitTileX = tileMapX;
+                hitTileY = tileMapY;
+
+                xHit = x;
+                yHit = y;
             }
 
-            int tile = GetTile(mapPos);
-            if (tile > 0)
-            {
-                hit = true;
-            }
+            break;
         }
 
-        // Calculate the distance
-        double perpWallDistance;
-        if (side == 0)
-        {
-            perpWallDistance = abs((mapPos.GetX() - position.GetX() + (1 - stepDirection.GetX()) / 2) / rayDirection.GetX());
-        }
-        else
-        {
-            perpWallDistance = abs((mapPos.GetY() - position.GetY() + (1 - stepDirection.GetY()) / 2) / rayDirection.GetY());
-        }
+        x += dx;
+        y += dy;
+    }
 
-        // Calculate the line height
-        int lineHeight = abs((int)(height / perpWallDistance));
+    if (dist)
+    {
+        dist = sqrt(dist);
 
-        // Calculate the lowest and highest pixel of the line
-        int drawStart = (-lineHeight / 2) + (height / 2);
-        int drawEnd = (lineHeight / 2) + (height / 2);
+        // Adjust for fish eye
+        dist *= cos(playerRot - rayAngle);
 
-        // Determine the color
+        // Calculate the position and height of the wall strip.
+        // The wall height is 1 unit, the distance from the player to the screen is viewDist,
+        // thus the height on the screen is equal to
+        // wallHeight * viewDist / dist
+        double height = round(viewDist / dist);
+
+        double drawStart = round((RENDER_HEIGHT / 2) - (height / 2));
+        double drawEnd = drawStart + height;
+
+        int tile = GetTile(Vector2D(hitTileX, hitTileY));
         Color color;
-        int tile = GetTile(mapPos);
         switch (tile)
         {
-            case 1:
-                color = RED;
-                break;
-            case 2:
-                color = GREEN;
-                break;
-            case 3:
-                color = BLUE;
-                break;
-            case 4:
-                color = WHITE;
-                break;
-            default:
-                color = MAGENTA;
-                break;
+        case 1:
+            color = RED;
+            break;
+        case 2:
+            color = GREEN;
+            break;
+        case 3:
+            color = BLUE;
+            break;
+        case 4:
+            color = WHITE;
+            break;
+        default:
+            color = MAGENTA;
+            break;
         }
 
         if (side == 1)
         {
             color = Color(color.GetR() / 2, color.GetG() / 2, color.GetB() / 2);
         }
-        
+
         // Wall
-        //DrawLine(Vector2D(x, drawStart), Vector2D(x, drawEnd), color);
-        DrawVerticalLine(x, drawStart, drawEnd, color);
+        DrawVerticalLine(col, drawStart, drawEnd, color);
 
-        // Ray
-        DrawLine(rayPosition * 8, (rayPosition + Vector2D(rayDirection.GetX() * perpWallDistance, rayDirection.GetY() * perpWallDistance)) * 8, MAGENTA);
-        //DrawLine(Vector2D(rayPositionX, rayPositionY) * 8, (Vector2D(rayPositionX, rayPositionY) + Vector2D(rayDirectionX, rayDirectionY)) * 8, MAGENTA);
+        DrawRay(xHit, yHit);
     }
+}
 
-
-    // Direction Line
-    //DrawLine(position * 8, (position + direction * 5) * 8, MAGENTA);
-
-    // Camera Plane
-    //DrawLine((position + direction - cameraPlane) * 8, ((position + direction + cameraPlane) * 8), MAGENTA);
-
-    for (int x = 0; x < MAP_WIDTH; x++)
-    {
-        for (int y = 0; y < MAP_HEIGHT; y++)
-        {
-            if (map[(y * MAP_WIDTH) + x] != 0)
-            {
-                DrawRect((x * 8), (y * 8), 8, 8, WHITE);
-            }
-        }
-    }
+void DrawRay(int x, int y)
+{
+    Vector2D start(playerX * 8, playerY * 8);
+    Vector2D end(x * 8, y * 8);
+    DrawLine(start, end, RED);
 }
 
 void Render()
@@ -298,15 +335,53 @@ void Render()
     int pitch = 0;
     SDL_LockTexture(screenTexture, nullptr, (void**)&pPixels, &pitch);
 
-    memcpy(pPixels, pixels, (width * height) * 4);
+    memcpy(pPixels, pixels, (RENDER_WIDTH * RENDER_HEIGHT) * 4);
 
     SDL_UnlockTexture(screenTexture);
 
-    SDL_Rect renderRect = { 0, 0, width, height };
-    SDL_RenderCopy(renderer, screenTexture, nullptr, &renderRect);
+    SDL_Rect renderRect = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
+    SDL_RenderCopyEx(renderer, screenTexture, nullptr, &renderRect, 0, NULL, SDL_FLIP_NONE);
 
     SDL_RenderPresent(renderer);
-    memset(pixels, 0x00, width * height * 4);
+    memset(pixels, 0x00, RENDER_WIDTH * RENDER_HEIGHT * 4);
+}
+
+void Minimap()
+{
+    for (int x = 0; x < MAP_WIDTH; x++)
+    {
+        for (int y = 0; y < MAP_HEIGHT; y++)
+        {
+            //DrawLine(Vector2D(0, y) * 8, Vector2D(MAP_WIDTH, y) * 8, WHITE);
+            //DrawLine(Vector2D(x, 0) * 8, Vector2D(x, MAP_HEIGHT) * 8, WHITE);
+
+            int tile = GetTile(Vector2D(x, y));
+            if (tile != 0)
+            {
+                Color color;
+                switch (tile)
+                {
+                case 1:
+                    color = RED;
+                    break;
+                case 2:
+                    color = GREEN;
+                    break;
+                case 3:
+                    color = BLUE;
+                    break;
+                case 4:
+                    color = WHITE;
+                    break;
+                default:
+                    color = MAGENTA;
+                    break;
+                }
+
+                DrawRect((x)* 8, (y)* 8, 8, 8, color);
+            }
+        }
+    }
 }
 
 void Quit()
@@ -325,15 +400,15 @@ int GetTile(Vector2D position)
 
 void SetPixel(int x, int y, Color color)
 {
-    if (x < 0 || y < 0 || x >= width || y >= height)
+    if (x < 0 || y < 0 || x >= RENDER_WIDTH || y >= RENDER_HEIGHT)
     {
         return;
     }
 
-    pixels[((y * width) + x) * 4 + 3] = color.GetR();
-    pixels[((y * width) + x) * 4 + 2] = color.GetG();
-    pixels[((y * width) + x) * 4 + 1] = color.GetB();
-    pixels[((y * width) + x) * 4 + 0] = color.GetA();
+    pixels[((y * RENDER_WIDTH) + x) * 4 + 3] = color.GetR();
+    pixels[((y * RENDER_WIDTH) + x) * 4 + 2] = color.GetG();
+    pixels[((y * RENDER_WIDTH) + x) * 4 + 1] = color.GetB();
+    pixels[((y * RENDER_WIDTH) + x) * 4 + 0] = color.GetA();
 }
 
 void DrawVerticalLine(int x, int y1, int y2, Color color)
@@ -363,11 +438,11 @@ void DrawLine(Vector2D start, Vector2D end, Color color)
     }
 }
 
-void DrawRect(int x, int y, int width, int height, Color color)
+void DrawRect(int x, int y, int RENDER_WIDTH, int RENDER_HEIGHT, Color color)
 {
-    for (int xIndex = 0; xIndex < width; xIndex++)
+    for (int xIndex = 0; xIndex < RENDER_WIDTH; xIndex++)
     {
-        for (int yIndex = 0; yIndex < height; yIndex++)
+        for (int yIndex = 0; yIndex < RENDER_HEIGHT; yIndex++)
         {
             SetPixel(x + xIndex, y + yIndex, color);
         }
