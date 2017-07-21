@@ -256,3 +256,8 @@ FakesAssemblies/
 **/*.Server/GeneratedArtifacts
 **/*.Server/ModelManifest.xml
 _Pvt_Extensions
+
+# CMAKE stuff
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
