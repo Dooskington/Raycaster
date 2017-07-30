@@ -1,3 +1,3 @@
-A simple raycaster.
-http://declanhopkins.com/the-timeless-art-of-raycasting/
+A simple raycaster, written in C++.
+
 ![Raycaster](http://declanhopkins.com/static/images/screenshots/raycaster.png)
